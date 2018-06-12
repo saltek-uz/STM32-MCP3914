@@ -47,23 +47,22 @@ static void MX_USART2_UART_Init(void);
 static void MX_IWDG_Init(void);
 
 
-const uint16_t _frame_size = 10 ; // соотвествует 22-м периодам входной синусоиды
-
-uint8_t  spi_rx[25];    // Буфера приема и передачи SPI (0x41 - адрес нулевой ячейки, чтение)
+const uint16_t _frame_size = 50 ; // equals to 25 integer periods of incomind sinusoide
+uint8_t  spi_rx[25];    // 2 buffers for receive/transmit SPI (0x41 - is opcode for reading from 0th register of MCP3914
 uint8_t  spi_tx[25] = {0x41,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-uint8_t  block_ready = 0, energy_ready = 0;       // Флаг готовности СКЗ
-uint8_t k;                      // временная переменная для передачи UART
-uint16_t  i,j,n;                // временные переменные цикла 
-uint32_t a;                     // временная переменная для подсчета СКЗ
+uint8_t  block_ready = 0, energy_ready = 0;       
+uint8_t k;                      
+uint16_t  i,j,n;                 
+uint32_t a;                     
 
-int32_t       adc[6] = {0,0,0,0,0,0};   // RAW значения АЦП, ниже смещение 0
+int32_t       adc[6] = {0,0,0,0,0,0};   
 int32_t       adc_offset[6] = {0x00800CE0, 0x00800BB0, 0x00800CA0, 0x00800D00, 0x00801000, 0x00800F00};
 //  int32_t       adc_offset[6] = {0x00800D00, 0x00800000, 0x00800000, 0x00800000, 0x00800000, 0x00800000};
 
-uint64_t   sq_sum[6] = {0,0,0,0,0,0};   // переменные для подсчета суммы квадратов 
- int64_t  pos_sum[3] = {0,0,0};         // переменные для подсчета суммы положительной энергии 
- int64_t  neg_sum[3] = {0,0,0};         // переменные для подсчета суммы отрицтельной энергии
+uint64_t   sq_sum[6] = {0,0,0,0,0,0};    
+ int64_t  pos_sum[3] = {0,0,0};          
+ int64_t  neg_sum[3] = {0,0,0};         
 
 float32_t pos_power[3];             // positive mult
 float32_t neg_power[3];             // negative mult
@@ -72,13 +71,13 @@ int64_t _tmp;
 float32_t pos_energy[3], _pos_energy[3];  
 float32_t neg_energy[3], _neg_energy[3];
  
-float32_t _rms[6];     // среднее из суммы квадратов
-float32_t  rms[6];     // СКЗ 
+float32_t _rms[6];     
+float32_t  rms[6];      
 
-uint16_t _cnt =0, periods = 0; // Счетчики тиков АЦП и периодов 
+uint16_t _cnt =0, periods = 0;  
 
 //------------------------------------------------------------------------------
- uint32_t Read3914(uint8_t address)
+ uint32_t Read3914(uint8_t address) // Simple read one register
 {
 	uint8_t read_address;
         uint8_t ii[4];
@@ -99,7 +98,7 @@ uint16_t _cnt =0, periods = 0; // Счетчики тиков АЦП и периодов
 }
 
 //------------------------------------------------------------------------------
-void Write3914(uint8_t address, uint8_t b1,uint8_t b2, uint8_t b3)
+void Write3914(uint8_t address, uint8_t b1,uint8_t b2, uint8_t b3) // write register
 {
 	uint8_t write_address;
         uint8_t ii[4],jj[4];
@@ -117,15 +116,15 @@ CS_HIGH;
 }
 
 //------------------------------------------------------------------------------
-void MCP_Init(void)     // Первичная настройка АЦП
+void MCP_Init(void)     // ГЏГҐГ°ГўГЁГ·Г­Г Гї Г­Г Г±ГІГ°Г®Г©ГЄГ  ГЂГ–ГЏ
 {
 uint8_t i;
-    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // РЕСЕТ АЦП - поднимаем
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // MCP_Reset pin
 
-    Write3914(0x1F,0xA5,0,0);           // Разблокировка защиты регистров 
-    Write3914(0x0E,0,0,0);              // Тактовая с кварца (не внешняя)
+    Write3914(0x1F,0xA5,0,0);           // Unlock to change registers 
+    Write3914(0x0E,0,0,0);              // 
 
-    for (i=0;i<0x1F;i++) Read3914(0);   // выдергивает всю таблицу регистров АЦП
+    for (i=0;i<0x1F;i++) Read3914(0);   // 
     
     
     Write3914(0x1F,0xA5,0,0);    
@@ -133,48 +132,47 @@ uint8_t i;
 
          Write3914(0x09,0,0,0);
          Write3914(0x0A,0,0,0);
-         Write3914(0x0B,0x01,0x24,0x00);  // Усиление, для напряжения - 1, тока - 4
+         Write3914(0x0B,0x01,0x24,0x00);  // 
          Write3914(0x0C,0xA9,0,0);
          Write3914(0x0D,0xF8,0x60,0x50);
 
-    Write3914(0x1F,0x00,0,0);    // и блокируем настройки от случайного изменения 
+    Write3914(0x1F,0x00,0,0);    // after set up, lock settings for prevent unexpected changes of it 
 
 }
 //------------------------------------------------------------------------------
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) // прерывание внешнее (с ног)
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) 
 {
-  if (GPIO_Pin == GPIO_PIN_1)  // идентификация с какой ноги прилетело прерывание
-    {                          // нога 1 это DATA_READY с АЦП 
-      CS_LOW;                  // сигнал CS - тащим вниз на период чтения пакета АЦП
-         HAL_IWDG_Refresh(&hiwdg); // Сабака 
-      while (!(  HAL_SPI_TransmitReceive_IT(&hspi1,spi_tx,spi_rx,19) == HAL_OK)) {}; // Запускаем чтение каналов 0-5 с АЦП
-    }
-    else if (GPIO_Pin == GPIO_PIN_2)    // нога 2 это детектор целого периода синусоиды
+  if (GPIO_Pin == GPIO_PIN_1)  // here comes MCP_Data_Ready 
+    {                          
+      CS_LOW;                  
+         HAL_IWDG_Refresh(&hiwdg);  
+      while (!(  HAL_SPI_TransmitReceive_IT(&hspi1,spi_tx,spi_rx,19) == HAL_OK)) {}; // sending/receiving 19 bytes from MCP
+    }	// ! Actually MCP3914 has independent 8 ADC channels, but I need just 6 of it
+    else if (GPIO_Pin == GPIO_PIN_2)    // impulse from zero crossing detection sheme
     {
-      HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_9); // на индикацию
-      periods++;                        // целое число периодов синусоиды на входе
+      HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_9); 
+      periods++;                        
     } 
     
 
 };
 
-void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) // наступает при считывании 19 байт с АЦП
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) // 19 bytes in the buffer now
 {
-    HAL_IWDG_Refresh(&hiwdg);   // Опять сабака однака
-  if (hspi == &hspi1) {         // Является ли прием с SPI1, здесь избыточно   
+    HAL_IWDG_Refresh(&hiwdg);   
+  if (hspi == &hspi1) {            
     CS_HIGH;
      for (i=0;i<6;i++) 
       {
         adc[i] =  ((uint32_t)spi_rx[i*3+1] << 16) + ((uint32_t)spi_rx[i*3+2] << 8) + (uint32_t)spi_rx[i*3+3] ;
-        adc[i] =  ( ( adc[i] ^ 0x00800000) - adc_offset[i]); // Сборка 24бит данных и смещение нуля
+        adc[i] =  ( ( adc[i] ^ 0x00800000) - adc_offset[i]); 
       };
 
-// ----------------* Расчеты на лету *------------------------------------------
      for (i=0;i<6;i++) 
-              sq_sum[i] = sq_sum[i] + (uint64_t) adc[i] *  (uint64_t) adc[i]; // Сумма квадратов (для СКЗ)
+              sq_sum[i] = sq_sum[i] + (uint64_t) adc[i] *  (uint64_t) adc[i]; // sum of squares
 
-    for (i=0;i<3;i++) 
+    for (i=0;i<3;i++)  // energy 
     {
       switch (i)
       {
@@ -192,24 +190,23 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) // наступает при считыван
           neg_sum[i] += _tmp;
        }
     }
-                                                                        
-// ----------------* Расчеты на лету *------------------------------------------
-    _cnt++;
 
- if (periods > _frame_size) // несколько целых периодов синусоиды 
+ _cnt++;
+
+ if (periods > _frame_size)  
    {
      for (i=0;i<6;i++) 
       {
-         _rms[i] = (double) sq_sum[i] / (_cnt+1);   // подсчет среднего от суммы квадратов
-           sq_sum[i] =0;                          // корень будет вычислятся в основном режиме, как и передача      
-            block_ready = 1;                      // Флаг для основного цикла
+         _rms[i] = (double) sq_sum[i] / (_cnt+1);   
+           sq_sum[i] =0;                                
+            block_ready = 1;                      
             periods = 0;
       }
 
     for (i=0;i<3;i++) 
     {
-      pos_power[i] =   pos_sum[i]  / 2000000; pos_power[i] = pos_power[i] / _cnt;          
-      neg_power[i] = - neg_sum[i]  / 2000000; neg_power[i] = neg_power[i] / _cnt;
+      pos_power[i] =   pos_sum[i]  / 2000000; pos_power[i] = pos_power[i] / (_cnt+1);          
+      neg_power[i] = - neg_sum[i]  / 2000000; neg_power[i] = neg_power[i] / (_cnt+1);
       pos_sum[i] = 0;
       neg_sum[i] = 0;
     }
@@ -233,25 +230,24 @@ int main(void)
 
 while (1)
   {
-    HAL_IWDG_Refresh(&hiwdg); // Хотдог
+    HAL_IWDG_Refresh(&hiwdg); // 
 
-    if (block_ready == 1)  // Флаг готовности данных СКЗ к обработке
+    if (block_ready == 1)  // 
      {
-       k =0xFE; HAL_UART_Transmit(&huart2,&k,1,1000); // Начало пакета 
+       k =0xFE; HAL_UART_Transmit(&huart2,&k,1,1000); //  
         for(n=0; n<6; n++) 
          { 
-           rms[n] = sqrt(_rms[n]); a = round(rms[n]); // Корень из суммы квадратов, округление до целого
-           for(j=0; j<6; j++)                         // Цикл передачи (НЕХ цифрами) значений СКЗ
+           rms[n] = sqrt(_rms[n]); a = round(rms[n]); // 
+           for(j=0; j<6; j++)                         // 
              {
                 k = a & 0x0000000F; a = a >> 4; if (k < 10) k = k+ 48; else k =k + 55; 
                 HAL_UART_Transmit(&huart2,&k,1,1000);  
              };
          };   
- // ----------------------------------------------------------------------------
-  // Обдумать целесообразность передачи мощности ? альтернатива - передавать коэф. мощности 
-        for(n=0; n<3; n++)   // Power - positiwe 
+
+        for(n=0; n<3; n++)   // Power - positive 
          { 
-           a = round(pos_power[n]); //a = (n+5)*256;
+           a = round(pos_power[n]); 
            for(j=0; j<6; j++)                         
              {
                 k = a & 0x0000000F; a = a >> 4; if (k < 10) k = k+ 48; else k =k + 55; 
@@ -259,7 +255,7 @@ while (1)
              };
          };   
 
-        for(n=0; n<3; n++) // Power -negatiwe
+        for(n=0; n<3; n++) // Power -negative
          { 
            a = round(neg_power[n]); 
            for(j=0; j<6; j++)                         
@@ -269,8 +265,8 @@ while (1)
              };
          };  
      
-        k =0xFF; HAL_UART_Transmit(&huart2,&k,1,1000); // и концовка пакета 
-            block_ready = 0;                               // флаг готовности СКЗ сброшен     
+        k =0xFF; HAL_UART_Transmit(&huart2,&k,1,1000);  
+            block_ready = 0;                                    
      };
   }; 
 
