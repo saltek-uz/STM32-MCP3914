@@ -12,13 +12,13 @@
       2. Interrupt by integer periods of incoming signal
       3. RMS calculations
       4. Translate RMS values to optoisolated interface
-
-    need to realize (urgent):
-
       5. Calculations for power (different for positive and negative)
       6. Count the summary energy (both) for  period beetween some ticks of sensor
       7. Translate Power and counter values to optoisolated interface
-      8. Optimize & review code
+	
+	need to do:
+	
+      8. Optimize & review code, comment on english instead russian
 
   
 */
